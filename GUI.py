@@ -531,3 +531,511 @@ class PacketSnifferGUI:
 
 
         def _build_lower_panel(self):
+            pane = ttl.PanedWindow(self._main_pane, orient="horizontal")
+            self._main_pane-add(pane, weight=2)
+
+            detail_outer = ttk.Frame(pane)
+            pane.add(detail_outer, weight=3)
+            self._build_detail_notebook(detail_outer)
+
+            stats_frame = ttk.Label(pane, text="Statistics", padding=10)
+            pane.add(stats_frame, weight=1)
+            self._build_stats_panel(stats_frame)
+
+        def _build_detail_notebook(self, parent):
+            notebook = ttk.Notebook(parent)
+            notebook.pack(fill="both", expand=True)
+
+            layers_tab = ttk.Frame(notebook)
+            notebook.add(layers_tab, text=" Packet Details ")
+            self._build_layers_tree(layers_tab)
+
+            hex_tab = ttk.Frame(notebook)
+            notebook.add(hex_tab, text=" HEX / ASCIII Dump ")
+            self._build_hex_panel(hex_tab)
+
+        def _build_layers_tree(self, parent):
+            self._layers_tree = ttk.Treeview(parent, show="tree", selectmode="browse")
+
+            y_scroll = ttk.Scrollbar(
+                parent,
+                orient="vertical",
+                command=self._layers_tree.yview
+            )
+
+            self._layers_tree.configure(yscrollcommand=y_scroll.set)
+
+            self._layers_tree.grid(row=0, column=0, sticky="nsew")
+            y_scroll.grid(row=0, column=1, sticky="ns")
+
+            parent.rowconfigure(0, weight=1)
+            parent.columnconfigure(0, weight=1)
+
+        def _build_hex_panel(self, parent):
+            self._hex_text = tk.Text(
+                parent,
+                wrap="none",
+                bg=C["hex_bg"],
+                fg=C["hex_fg"],
+                insertbackgroun=C["text"]
+                font=("Courier New", 10),
+                relief="flat"
+            )
+
+            y_scroll = ttk.Scrollbar(
+                parent,
+                orient="vertical"
+                command=self._hex_text.yview
+            )
+
+            x_scroll = ttk.Scrollbar(
+                parent,
+                orient="horizontal"
+                command=self._hex_text.xview
+            )
+
+            self._hex_text.configure(
+                yscrollcommand=y_scroll.set
+                xscrollcommand=x_scroll.set
+            )
+
+            self._hex_text.grid(row=0, column=0, sticky="nsew")
+            y_scroll.grid(row=0, column=1, sticky="ns")
+            x_scroll.grid(row=1, column=0, sticky="ew")
+
+            parent.rowconfigure(0,weight=1)
+            parent.columnconfigure(0, weight=1)
+
+            self._hex_text.insert("end", "Select a packet to view hex and ASCII data.")
+            self._hex_text.config(state="disabled")
+        
+        def _build_stats_panel(self,parent):
+            self._total_packets_var = tk.StringVar(value="0")
+            self._total_bytes_var = tk.StringVar(value="0 B")
+            self._packet_rate_var = tk.StringVar(value="0.0 packets/sec")
+            self._elapsed_var = tk.StringVar(value="0s")
+
+            row = 0
+
+            ttk.Label(parent, text="Total Packets:").grid(row=row, column=0, sticky="w", pady=4)
+            ttk.Label(parent, textvariable=self._total_packets_var).grid(row=row, column=1, sticky="w", pady=4)
+
+            row +=1
+
+            ttk.Label(parent, text="Total Bytes:").grid(row=row, column=0, sticky="w", pady=4)
+            ttk.Label(parent, textvariable=self._total_bytes_var).grid(row=row, column=1, sticky="w", pady=4)
+
+            row +=1
+
+            ttk.Label(parent, text="Packet Rate:").grid(row=row, column=0, sticky="w", pady=4)
+            ttk.Label(parent, textvariable=self._packet_rate_var).grid(row=row, column=1, sticky="w", pady=4)
+
+            row +=1
+
+            ttk.Label(parent, text="Elapsed Time:").grid(row=row, column=0, sticky="w", pady=4)
+            ttk.Label(parent, textvariable=self._elapsed_var).grid(row=row, column=1, sticky="w", pady=4)
+
+            row +=1
+
+            ttk.Separator(parent, orient="horizontal").grid(
+                row=row,
+                column=0,
+                columnspan=2,
+                stacky="ew",
+                pady=10
+            )
+
+            row +=1
+
+
+            ttk.Label(
+                parent,
+                text="Protocol Counts",
+                font=("Segoe UI", 10, "bold"),
+                foreground=C["accent"]
+            ).grid(row=row, column=0, columnspan=2, sticky="w", pady=(0, 6))
+
+            row += 1
+
+            self._protocol_stats_text = tk.Text(
+                parent,
+                height=12,
+                bg=C["surface"],
+                fg=C["text"],
+                font=("Courier New", 10),
+                relief="flat"
+                wrap="word"
+            )
+            
+            self._protocol_stats_text.grid(
+                row=row,
+                column=0,
+                columnspan=2,
+                sticky="nsew"
+            )
+
+            self._protocol_stats_text.grid(
+                row=roe,
+                column=0,
+                columnspan=2,
+                sticky="nsew"
+            )
+
+            self._protocol_stats_text.insert("end", "No packets yet.")
+            self._protocol_stats_text.config(state="disabled")
+
+            parent.columnconfigure(1, weight=1)
+            parent.rowconfigure(row, weight=1)
+
+        def _start_capture(self):
+            interface_name = self._iface_var.get().strip()
+
+            if interface_name =="":
+                interface_name = None
+
+        try:
+            self._sniffer.start(interface_name)
+            self._capturing = True
+            self._btn_start.config(state="disabled")
+            self._btn_stop.config(state="normal")
+            self._status_var.set("Capturing")
+            self._status_label.config(fg=C["accent"])
+        except Exception as error:
+            messagebox.showerror("Capture Error", str(error))
+            self._status_var.set("Capture failed")
+            self._status_label.config(fg=C["red"])
+
+    def _stop_capture(self):
+        self._sniffer.stop()
+        self._capturing = False
+        self._btn_start.config(state="normal")
+        self._btn_stop.config(state="disabled")
+        self._status_var.set("Stopped")
+        self._status_label.config(fg=C["muted"])
+
+    def _load_file(self):
+        file_path = filedialog.askopenfilename(
+            title="Open Packet Capture File",
+            filetypes=[
+                ("Packet capture Files", "*.pcap *.pcapng"),
+                ("All Files", "*.*")
+            ]
+        )
+
+        if file_path =="":
+            return
+
+        try:
+            count = self._sniffer.load_from_file(file_path)
+            self._poll_queue()
+            self._apply_filters()
+            self._status_var.set(f"Loaded {count} packets")
+            self._status_label.config(fg=C["accent"])
+        except Exception as error:
+            messagebox.showerror("File Error", str(error))
+            self._status_var.set("File load failed")
+            self._status_label.config(fg=C["red"])  
+
+
+    def _clear_packets(self):
+        self._stop_capture()
+
+        self._all_packets.clear()
+        self._packet_times.clear()
+        self._visible_packet_indexes.clear()
+        self._packet_counter = 0
+        self._stats.reset()
+
+        while not self._packet_queue.empty():
+            self._packet_queue.get()
+
+        for row in self._tree.get_children():
+            self._tree.delete(row)
+
+        self._clear_details()
+        self._clear_hex()
+        self._update_stats_panel()
+
+        self._count_var.set("0 packets")
+        self._filter_label_var.set("")
+        self._status_var.set("Packets cleared")
+        self._status_label.config(fg=C["muted"])
+
+    def _on_packet_recieved(self, packet):
+        self._packet_queue.put(packet)
+
+    def _poll_queue(self):
+        updated = False
+
+        while not self._packet_queue.empty():
+            packet = self._packet_queue.get()
+
+            self._packet_counter +=1
+            packet["_gui_number"] = self._packet_counter
+            packet["_gui_time"] = fmt_time()
+
+            self._all_packets.append(packet)
+            self._packet_times.append(packet["_gui_time"])
+            self._stats.record(packet)
+
+            packet_index = len(self._all_packets) - 1
+
+            if self._filter.matches(packet):
+                self._visibel_packet_indexes.append(packet_index)
+                self._insert_packet_row(packet, packet_index)
+                updated = True
+        
+        if updated and self._autoscroll.get():
+            rows = self._tree.get_children()
+
+            if rows: self._tree.see(rows[-1])
+        
+        self._count_var.set(f"{len(self._all_packets)} packets")
+        self.root.after(100, self._poll_queue)
+
+    def _insert_packet_row(self, packet, packet_index):
+        protocol = packet.get("protocol", "Unknown")
+        tag = protocol if protocol in PROTO_TAGS else "defult"
+
+        values = (
+            packet.get("_gui_number", packet_index + 1),
+            packet.get("_gui_time", ""),
+            protocol,
+            packet.get("src_ip", "N/A"),
+            packet.get("src_port", "N/A"),
+            packet.get("dst_ip", "N/A"),
+            packet.get("src_port", "N/A"),
+            packet.get("length", "N/A"),
+            packet.get("info", "")
+        )
+
+        self._tree.insert(
+            "",
+            "end",
+            iid=str(packet_index),
+            values=values,
+            tags=(tag,)
+        )
+    
+    def _apply_filters(self):
+        self._filter.set_filter("protocol", self._proto_var.get())
+        self._filter.set_filter("src_ip", self._src_ip_var.get())
+        self._filter.set_filter("dst_ip", self._dst_ip_var.get())
+        self._filter.set_filter("src_port",  self._src_ip_var.get())
+        self._filter.set_filter("dst_port", self._dst_ip_var.get())
+
+        for row in self._tree.get_children():
+            self._tree.delete(row)
+
+        self._visible_packet_indexes.clear()
+
+        for index, packet in enumerate(self._all_packets):
+            if self._filter.matches(packet):
+                self._visible_packet_indexes.append(index)
+                self._insert_packet_row(packet, index)
+
+        self._clear_details()
+        self._clear_hex()
+
+        if self._filter.has_active_filters():
+            self._filter_label_var.set(
+                f"Showing {len(selft._visible_packet_indexes)} of {len(self._all_packets)} packets"
+            )
+        else:
+            self._filter_label_var.set("")
+
+    def _clear_filters(self):
+        self._proto_var.set("")
+        self._src_ip_var.set("")
+        self._dst_ip_var.set("")
+        self._src_port_var.set("")
+        self._dst_port_var.set("")
+
+        self._filter.clear_all()
+        self._apply_filters()
+
+    def _sort_column(self, column):
+        rows = list (self._tree.get_children())
+
+        def get_sort_value(row_id):
+            value = self._tree.set(row_id, column)
+
+            try:
+                return int(value)
+            except ValueError:
+                return value.lower()
+            
+        rows.sort(key=get_sort_value)
+
+        for index, row_id in enumerate(rows):
+            self._tree.move(row_id, "", index)
+
+    def _on_row_select(self, event):
+        selected_rows = self._tree.selection()
+
+        if not selected_rows:
+            return
+        
+        packet_index = int(selected_rows[0])
+        packet = self._all_packets[packet_index]
+
+        self._show_packet_details(packet)
+        self._show_packet_hex(packet)
+
+    def _show_packet_details(self, packet):
+        for item in self._layers_tree.get_children():
+            self._layers_tree.delete(item)
+
+        summary = self._layers_tree.insert(
+            "",
+            "end",
+            text="Packe Summary"
+            oopet = True
+        )
+
+        summary_fields = [
+            ("Number", packet.get("_gui_number", "N/A")),
+            ("Time", packet.get("_gui_time", "N/A")),
+            ("Protocol", packet.get("protocol", "N/A")),
+            ("Length", f"{packet.get("length", "N/A")} bytes"),
+            ("Source MAC", packet.get("src_mac", "N/A")),
+            ("Destination MAC", packet.get("dst_mac", "N/A")),
+            ("Source IP", packet.get("src_ip", "N/A")),
+            ("Destination IP", packet.get("dst_ip", "N/A")),
+            ("Source Port", packet.get("src_port", "N/A")),
+            ("Destination Port", packet.get("dst_port", "N/A")),
+            ("TTL/Hop Limit", packet.get("ttl", "N/A")),
+            ("IP Version", packet.get("ip_version", "N/A")),
+            ("Fragment Flags", packet.get("frag_flags", "N/A")),
+            ("Fragment Offset", packet.get("frag_offset", "N/A")),
+            ("TCP Flags", packet.get("tcp_flags", "N/A")),
+            ("Info", packet.get("info", "")),
+        ]
+
+        for name, value in summary_fields:
+            self._layers_tree.insert(
+                summary,
+                "end",
+                text=f"{name}: {value}"
+            )
+
+        layers = packet.get("layers", [])
+
+        if len(layers) == 0:
+            self._layers_tree.insert(
+                "",
+                "end",
+                text="No layer details available"
+            )
+        else:
+            for layer in layers:
+                layer_name = layer.get("name", "Unknown Layer")
+
+                layer_node = self._layers_tree.insert(
+                    "",
+                    "end",
+                    text=layer_name,
+                    open=True
+                )
+
+                for field_name, field_value in layer.get("fields", []):
+                    self._layers_tree.insert(
+                        layer_node,
+                        "end",
+                        text=f"{field_name}: {field_value}"
+                    )
+
+    def _show_packet_hex(self, packet):
+        self._hex_text.config(state="normal")
+        self._hex_text.delete("1.0", "end")
+
+        raw_packet = packet.get("raw_packet")
+
+        self._hex_text.insert("end", "Full Packet Hex Dump\n")
+        self._hex_text.insert("end", "-" * 80 + "\n")
+
+        if raw_packet is not None:
+            self._hex_text.insert("end", format_full_hex(raw_packet))
+        else:
+            self._hex_text.insert("end", "No raw packet data available.")
+
+        self._hex_text.insert("end", "\n\nPayload Hex\n")
+        self._hex_text.insert("end", "-" * 80 + "\n")
+
+        payload_hex = packet.get("payload_hex", "")
+
+        if payload_hex:
+            self._hex_text.insert("end", payload_hex)
+        else:
+            self._hex_text.insert("end", "No payload found.")
+
+        self._hex_text.insert("end", "\n\nPayload ASCII\n")
+        self._hex_text.insert("end", "-" * 80 + "\n")
+
+        payload_ascii = packet.get("payload_ascii", "")
+
+        if payload_ascii:
+            self._hex_text.insert("end", payload_ascii)
+        else:
+            self._hex_text.insert("end", "No payload found.")
+
+        self._hex_text.config(state="disabled")
+
+    def _clear_details(self):
+        for item in self._layers_tree.get_children():
+            self._layers_tree.delete(item)
+
+        self._layers_tree.insert(
+            "",
+            "end",
+            text="Select a packet to view details."
+        )
+
+    def _clear_hex(self):
+        self._hex_text.config(state="normal")
+        self._hex_text.delete("1.0", "end")
+        self._hex_text.insert("end", "Select a packet to view hex and ASCII data.")
+        self._hex_text.config(state="disabled")
+
+    def _update_stats_panel(self):
+        summary = self._stats.get_summary()
+
+        self._total_packets_var.set(str(summary["total_packets"]))
+        self._total_bytes_var.set(fmt_bytes(summary["total_bytes"]))
+        self._packet_rate_var.set(f"{summary['packets_per_second']} packets/sec")
+        self._elapsed_var.set(summary["elapsed_formatted"])
+
+        self._protocol_stats_text.config(state="normal")
+        self._protocol_stats_text.delete("1.0", "end")
+
+        protocol_counts = summary["protocol_counts"]
+
+        if len(protocol_counts) == 0:
+            self._protocol_stats_text.insert("end", "No packets yet.")
+        else:
+            for protocol in sorted(protocol_counts):
+                count = protocol_counts[protocol]
+                self._protocol_stats_text.insert("end", f"{protocol}: {count}\n")
+
+        self._protocol_stats_text.config(state="disabled")
+
+        self.root.after(1000, self._update_stats_panel)
+
+
+def main():
+    root = tk.Tk()
+    app = PacketSnifferGUI(root)
+    root.mainloop()
+
+
+if __name__ == "__main__":
+    main()
+
+
+        
+
+
+
+
+
+
